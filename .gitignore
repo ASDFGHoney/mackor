@@ -1,0 +1,27 @@
+.build/
+build/
+.swiftpm/
+*.xcodeproj/
+.DS_Store
+._*
+
+# 서명·공증 자격 증명, 환경 파일
+.env
+.env.*
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# 릴리스 산출물, 로그, Xcode 사용자 데이터
+*.zip
+*.tar.gz
+*.tgz
+*.dmg
+*.pkg
+*.log
+DerivedData/
+*.xcresult
+xcuserdata/
+*.xcworkspace/
