@@ -4,7 +4,7 @@ import MackorCore
 import os
 
 /// 입력 내용은 기록하지 않는다. 전환 번호·시간, 입력 소스 ID, 보류 개수만 남긴다.
-/// 보기: log stream --level debug --predicate 'subsystem == "io.mackor.app"'
+/// 보기: /usr/bin/log stream --level debug --predicate 'subsystem == "io.mackor.app"' (zsh에서는 `log`가 셸 내장 명령이라 경로를 쓴다)
 let log = Logger(subsystem: "io.mackor.app", category: "switch")
 
 /// 한/영 키(Caps Lock → F18)를 누르는 순간 macOS의 입력 소스 전환 단축키를 보내고,

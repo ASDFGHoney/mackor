@@ -62,7 +62,7 @@ Caps Lock ──(HID 리매핑, 공개 IOKit API)──▶ F18
 - **시스템 설정을 바꾸지 않음**: 사용자가 이미 쓰는 ‘이전 입력 소스 선택’ 단축키(기본 ⌃Space)를 읽어서 그대로 합성합니다.
   F18 같은 기능키로 바꿔 둔 단축키도 그대로 씁니다.
 - **비공개 API 없음**: HID 리매핑과 Caps Lock 상태(`IOHIDServiceClient`), 보조 키 설정 확인(IOKit 레지스트리), 이벤트 탭, TIS 알림,
-  `SMAppService` 모두 공개 API입니다.
+  보안 입력 확인(`IsSecureEventInputEnabled`), `SMAppService` 모두 공개 API입니다.
 - **개인정보**: 키 내용은 저장하거나 기록하지 않습니다. 보류는 전환이 끝날 때까지(보통 20~130ms, 전환 한 번에 길어야 약 0.35초)
   메모리에서만 합니다.
 - **Caps Lock 켜짐 정리**: 매핑을 새로 걸 때 대문자 고정이 켜져 있으면 모든 키보드에서 끕니다(LED 포함).
@@ -73,6 +73,9 @@ Caps Lock ──(HID 리매핑, 공개 IOKit API)──▶ F18
 - **보조 키 설정 감지**: 시스템 설정 › 키보드 › 키보드 단축키 › 보조 키에서 Caps Lock을 다른 동작으로 바꿔 둔 키보드는
   그 설정이 먼저 적용되어 매핑이 가려집니다. 이런 키보드는 메뉴와 설정 도우미가 알려 줍니다.
 - **빠른 사용자 전환**: HID 매핑은 이 맥의 모든 사용자에게 걸리므로, 다른 사용자가 쓰는 동안에는 매핑을 풀고 돌아오면 다시 겁니다.
+- **보안 입력 중에는 macOS에 맡김**: 어느 앱이든 보안 입력을 켜 두면(비밀번호 칸, 터미널의 "보안 키보드 입력", 보안 입력을 끄지 않고
+  뒤로 간 앱) macOS는 **맨 앞 앱이 아니어도** 모든 이벤트 탭에서 키를 숨깁니다. 그대로 두면 Caps Lock이 아무 일도 하지 않으므로,
+  mackor는 0.25초마다 보안 입력을 확인해 켜져 있는 동안 매핑을 풀어 macOS 기본 Caps Lock 전환(느린 쪽)에 맡기고, 꺼지면 다시 겁니다.
 
 ## gksdud와 비교
 
@@ -81,7 +84,7 @@ Caps Lock ──(HID 리매핑, 공개 IOKit API)──▶ F18
 | 전환 직후 입력 | 전환 지연(20~130ms) 동안 씹힘 | 보류 후 순서대로 → 씹힘 없음 |
 | 시스템 단축키 | F19로 변경(비공개 `activateSettings` 사용) | 변경 안 함(⌃Space 합성) |
 | 배포 | 자체 서명 → 첫 실행 차단 | Developer ID 서명·공증 전제 |
-| 상태 감시 | 1초 폴링 | 장치 연결·잠자기 해제 알림 |
+| 상태 감시 | 1초 폴링 | 장치 연결·잠자기 해제 알림(보안 입력만 0.25초 확인) |
 
 ## 메뉴
 
@@ -91,6 +94,9 @@ Caps Lock ──(HID 리매핑, 공개 IOKit API)──▶ F18
 실행 중에 권한이 꺼지면 아이콘에 경고가 붙고 설정 도우미가 권한 단계로 안내합니다.
 Caps Lock을 한/영 키로 쓸 수 없는 키보드(Caps Lock에 다른 키 매핑이 있거나, 보조 키 설정이 가리는 경우)가 있으면 아이콘과 메뉴에
 경고와 해결 방법이 붙습니다. 원인을 없앤 뒤 메뉴를 다시 열거나 설정 도우미로 돌아오면 다시 확인합니다.
+보안 입력 때문에 macOS 기본 전환을 쓰는 동안에는 메뉴에 그 사실과 보안 입력을 켠 앱이 나옵니다(앱 이름은 IO 레지스트리의
+`IOConsoleUsers`, 곧 `ioreg -l -w 0 | grep SecureInput`과 같은 값에서 읽습니다. 문서에 없는 키라 없으면 이름 없이 알립니다).
+비밀번호를 칠 때마다 켜졌다 꺼지므로 아이콘은 바꾸지 않습니다.
 
 ## 알려진 한계
 
@@ -102,8 +108,10 @@ Caps Lock을 한/영 키로 쓸 수 없는 키보드(Caps Lock에 다른 키 매
 - 시스템 설정 › 키보드 › 키보드 단축키 › 보조 키에서 Caps Lock을 다른 동작으로 바꿔 둔 키보드에서는 그 설정이 먼저 적용되어
   동작하지 않습니다. ‘⇪ Caps Lock’으로 되돌리면 바로 적용됩니다. 거꾸로 다른 키(예: Control 키)를 ‘⇪ Caps Lock’으로 바꿔 두었다면
   mackor가 켜져 있는 동안 그 키도 한/영 키가 됩니다. Caps Lock과 Control을 맞바꿔 두었다면 Control 키도 ‘⌃ Control’로 함께 되돌리세요.
-- **보안 입력 중**(비밀번호 칸, 터미널의 "보안 키보드 입력")에는 macOS가 이벤트 탭에 키를 보여주지 않아
-  Caps Lock으로 한/영이 바뀌지 않습니다. macOS 기본 Caps Lock 전환이 이런 칸에서도 동작하던 것과 다른 점입니다.
+- **보안 입력 중**(비밀번호 칸, 터미널의 "보안 키보드 입력", 보안 입력을 끄지 않고 뒤로 간 앱)에는 mackor가 키를 볼 수 없어
+  macOS 기본 Caps Lock 전환으로 돌아갑니다. 그동안은 mackor를 쓰기 전처럼 전환이 늦고 전환 직후 친 글자가 이전 언어로 들어갈 수 있습니다.
+  시스템 설정의 ‘Caps Lock 키로 ABC 입력 소스 전환’을 꺼 두었다면 그동안 Caps Lock은 대문자 고정 키로 동작합니다.
+  보안 입력이 켜진 뒤 매핑을 풀기까지 최대 0.25초 동안은 Caps Lock이 아무 일도 하지 않습니다.
 - 입력 소스가 3개 이상이면 macOS의 "이전 입력 소스" 규칙대로 최근 두 입력 소스 사이를 오갑니다.
 - 전환이 끝나기도 전에 Caps Lock을 몇 번씩 이어 누르면(수십 ms 간격의 연타) macOS가 전환 단축키 하나를 드물게 무시해
   한/영이 한 번 어긋날 수 있습니다. 이때 그 전환의 보류분은 0.3초 뒤 이전 언어로 나갑니다.
@@ -136,19 +144,19 @@ e2e 환경 변수: `E2E_ONLY`(사례 고르기), `E2E_REPEAT`(반복), `MACKOR_A
 설정 도우미 확인: `--onboarding`(또는 `--onboarding=permission|try|done`)으로 바로 띄웁니다. 터미널에서 띄운 디버그 빌드는
 터미널의 접근성 권한을 물려받아 항상 허용됨으로 보이므로, 권한 없는 화면은 `--simulate-untrusted`로 보고
 `kill -USR1 <pid>`로 허용·해제를 흉내 냅니다. 이벤트 탭이 켜지는 실행 전에는 설치본을 종료하세요(두 인스턴스가 함께 전환함).
-로그: `log stream --level debug --predicate 'subsystem == "io.mackor.app"'` (전환 번호·시간, 입력 소스 ID, 보류 개수만 기록. 키 내용은 기록하지 않음).
+로그: `/usr/bin/log stream --level debug --predicate 'subsystem == "io.mackor.app"'` (전환 번호·시간, 입력 소스 ID, 보류 개수만 기록. 키 내용은 기록하지 않음).
 
 ### 배포
 
 ```sh
 xcrun notarytool store-credentials mackor-notary   # 한 번만
-MACKOR_VERSION=0.3.0 \
+MACKOR_VERSION=0.3.1 \
 MACKOR_SIGN_IDENTITY="Developer ID Application: 이름 (팀ID)" \
 MACKOR_NOTARY_PROFILE=mackor-notary \
 scripts/release.sh
 ```
 
-나온 zip을 GitHub 릴리스에 올리고 `v버전` 태그의 GitHub 릴리스로 올리고(예: `gh release create v0.3.0 build/mackor-0.3.0.zip`),
+나온 zip을 `v버전` 태그의 GitHub 릴리스로 올리고(예: `gh release create v0.3.1 build/mackor-0.3.1.zip`),
 스크립트가 출력한 `version`·`sha256`을 `Casks/mackor.rb`에 반영해 tap 저장소(`ASDFGHoney/homebrew-tap`)에도 넣습니다.
 
 ## 라이선스

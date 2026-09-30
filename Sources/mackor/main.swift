@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
     private var trustWatch = TrustWatch()
     /// 이 사용자의 세션이 앞에 있는지. 빠른 사용자 전환으로 다른 사용자가 쓰는 동안에는 false다.
     private var sessionActive = true
+    /// 보안 입력이 켜져 있는지. 그동안에는 이벤트 탭이 F18을 보지 못하므로 매핑을 풀어 macOS 기본 Caps Lock 전환에 맡긴다.
+    private var secureInput = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -35,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
             onboarding.show(at: step, permissionLost: settings.didSetUp)
         }
         schedulePermissionTimer()
+        watchSecureInput()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -50,12 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
     }
 
     /// 권한 상태에 맞춰 이벤트 탭과 키 매핑을 켜고 끈다. 탭 없이 매핑만 켜면 Caps Lock이 아무 일도 하지 않게 되므로 함께 움직인다.
-    /// 다른 사용자가 쓰는 동안(빠른 사용자 전환)에는 매핑만 푼다.
+    /// 다른 사용자가 쓰는 동안(빠른 사용자 전환)이나 보안 입력 중(탭이 키를 못 본다)에는 매핑만 푼다.
     private func refresh() {
         let trusted = Accessibility.isTrusted
         if trusted, !engine.isRunning { engine.start() }
         if !trusted, engine.isRunning { engine.stop() }
-        remapper.isActive = engine.isRunning && sessionActive
+        updateSecureInput()
+        remapper.isActive = engine.isRunning && sessionActive && !secureInput
         updateIcon()
         if trusted { rememberTrust() }
         if trustWatch.update(trusted) == .revoked {
@@ -73,6 +77,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
         permissionTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in self?.refresh() }
     }
 
+    /// 보안 입력은 알림이 없어 0.25초마다 확인한다. 켜진 뒤 매핑을 풀기 전까지는 Caps Lock이 아무 일도 하지 않으므로
+    /// 권한 확인(1초)보다 짧게 둔다. 바뀌었을 때만 refresh()로 매핑을 고친다.
+    private func watchSecureInput() {
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            guard let self, SecureInput.isEnabled != self.secureInput else { return }
+            self.refresh()
+        }
+        timer.tolerance = 0.05
+    }
+
+    /// 보안 입력이 켜지고 꺼지는 것을 기록한다. 뒤에 있는 앱이 켜 둔 채 남겨 두면 어느 앱에서든 F18이 막히므로 켠 앱을 남긴다.
+    private func updateSecureInput() {
+        let enabled = SecureInput.isEnabled
+        guard enabled != secureInput else { return }
+        secureInput = enabled
+        if enabled {
+            log.notice("보안 입력 켜짐(\(SecureInput.ownerName ?? "알 수 없는 앱", privacy: .public)): Caps Lock을 macOS 기본 전환에 맡김")
+        } else {
+            log.notice("보안 입력 꺼짐: Caps Lock을 다시 mackor가 처리")
+        }
+    }
+
     /// 권한이 있는 동안의 서명을 기억해 둔다. 나중에 서명이 바뀌어 권한 항목이 낡으면 설정 도우미가 알아챈다.
     private func rememberTrust() {
         let settings = Settings.shared
@@ -87,7 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
         let symbol = engine.isRunning && !conflicted ? "keyboard" : "keyboard.badge.exclamationmark"
         statusItem?.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "mackor")
         statusItem?.button?.toolTip = !engine.isRunning ? "mackor: 접근성 권한이 필요합니다"
-            : conflicted ? "mackor: Caps Lock을 한/영 키로 쓸 수 없는 키보드가 있습니다" : "mackor: Caps Lock으로 한/영 전환"
+            : conflicted ? "mackor: Caps Lock을 한/영 키로 쓸 수 없는 키보드가 있습니다"
+            : secureInput ? "mackor: 보안 입력 중이라 macOS 기본 Caps Lock 전환을 씁니다" : "mackor: Caps Lock으로 한/영 전환"
     }
 
     /// 빠른 사용자 전환: HID 매핑은 장치 단위라 이 맥의 모든 사용자에게 걸린다. 다른 사용자가 쓰는 동안에는 매핑을 푼다.
@@ -130,6 +157,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
             menu.addItem(item("접근성 권한 허용하기…", #selector(showPermissionStep)))
             menu.addItem(label(Settings.shared.didSetUp ? "⚠︎ 접근성 권한이 꺼져 있어 Caps Lock이 원래대로 돌아갔습니다"
                                                         : "mackor로 Caps Lock 한/영 전환을 쓰려면 macOS 접근성 권한이 필요합니다"))
+        }
+        if engine.isRunning, secureInput {
+            // 아이콘은 그대로 둔다. 비밀번호를 칠 때마다 켜졌다 꺼지므로 아이콘까지 바꾸면 깜박인다.
+            menu.addItem(label("⚠︎ 보안 입력이 켜져 있어 macOS 기본 Caps Lock 전환을 쓰는 중입니다"))
+            if let owner = SecureInput.ownerName {
+                menu.addItem(label("   켠 앱: \(owner) — 그 앱의 비밀번호 칸을 벗어나거나 앱을 다시 열면 돌아옵니다"))
+            } else {
+                menu.addItem(label("   비밀번호 칸을 벗어나거나 보안 입력을 켠 앱을 다시 열면 돌아옵니다"))
+            }
         }
         if engine.shortcutMissing {
             menu.addItem(label("⚠︎ 시스템 설정 › 키보드 › 키보드 단축키 › 입력 소스에서"))
