@@ -1,5 +1,5 @@
 #!/bin/bash
-# 로컬 빌드(build/mackor.app)를 /Applications 에 설치하고 실행한다. brew 설치와 같은 흐름을 재현한다.
+# 로컬 빌드(build/mackor.app)를 /Applications 에 설치하고 실행한다. brew 설치 뒤 처음 실행하는 흐름을 재현한다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

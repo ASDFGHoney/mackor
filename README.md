@@ -14,7 +14,8 @@ brew install --cask ASDFGHoney/tap/mackor
 Homebrew를 쓰지 않으면 [최신 릴리스](https://github.com/ASDFGHoney/mackor/releases/latest)에서 `mackor-버전.zip`을 받아
 `mackor.app`을 응용 프로그램 폴더로 옮긴 뒤 실행하세요.
 
-설치하면 바로 실행되고 로그인 항목에 등록됩니다. 처음 뜨는 설정 도우미를 따라 **접근성 권한**을 한 번 허용하면 끝입니다.
+설치한 뒤 mackor를 한 번 실행하세요(`open -a mackor`). 로그인 항목에 등록되어 이후에는 로그인하면 자동으로 실행됩니다.
+처음 뜨는 설정 도우미를 따라 **접근성 권한**을 한 번 허용하면 끝입니다.
 (키 입력을 가로채는 앱은 macOS 보안상 이 한 번의 허용을 피할 수 없습니다.)
 입력 소스 추가, 시스템 단축키 변경, 재시작은 필요 없습니다.
 
@@ -132,7 +133,7 @@ Caps Lock을 한/영 키로 쓸 수 없는 키보드(Caps Lock에 다른 키 매
 swift test            # 순수 로직 단위 테스트 (전환 게이트, 단축키 해석, 키 매핑, 설정 도우미 단계)
 scripts/e2e.sh        # 실제 애플 한국어 입력기로 종단 간 검증 (터미널에 접근성 권한 필요, 실행 중 손대지 말 것)
 scripts/build.sh      # build/mackor.app (유니버설, 기본 ad-hoc 서명)
-scripts/install.sh    # /Applications 에 설치 후 실행 (brew 설치 흐름 재현)
+scripts/install.sh    # /Applications 에 설치 후 실행 (brew 설치 뒤 첫 실행 흐름 재현)
 scripts/uninstall.sh  # 종료·키 매핑 복구·앱과 권한 항목 삭제
 ```
 
