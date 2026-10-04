@@ -10,7 +10,9 @@ import MackorCore
 final class KeyRemapper {
     static let shared = KeyRemapper()
 
-    private let client = IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
+    /// 간이 클라이언트는 만든 때의 서비스 목록만 돌려준다(그 뒤에 연결한 키보드·수신기가 빠진다). 목록을 새로 받는 함수는
+    /// 공개되어 있지 않아 services()가 부를 때마다 새로 만든다. 찾은 서비스를 쓰는 동안 놓이지 않도록 마지막 것을 붙잡아 둔다.
+    private var client = IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
     private var notificationPort: IONotificationPortRef?
     private var iterator: io_iterator_t = 0
     private var pendingApply: DispatchWorkItem?
@@ -100,9 +102,13 @@ final class KeyRemapper {
         }
     }
 
+    private func services() -> [IOHIDServiceClient] {
+        client = IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
+        return IOHIDEventSystemClientCopyServices(client) as? [IOHIDServiceClient] ?? []
+    }
+
     private func keyboards() -> [IOHIDServiceClient] {
-        let services = IOHIDEventSystemClientCopyServices(client) as? [IOHIDServiceClient] ?? []
-        return services.filter { IOHIDServiceClientConformsTo($0, UInt32(kHIDPage_GenericDesktop), UInt32(kHIDUsage_GD_Keyboard)) != 0 }
+        services().filter { IOHIDServiceClientConformsTo($0, UInt32(kHIDPage_GenericDesktop), UInt32(kHIDUsage_GD_Keyboard)) != 0 }
     }
 
     /// DJI 수신기마다 버튼 → Fn 매핑을 걸거나(active) 우리 항목을 지운다. 이미 맞으면 쓰지 않는다.
@@ -125,8 +131,7 @@ final class KeyRemapper {
 
     /// 꽂혀 있는 DJI 수신기. 키보드가 아니라 consumer 장치라 keyboards()에 들지 않는다.
     private func micReceivers() -> [IOHIDServiceClient] {
-        let services = IOHIDEventSystemClientCopyServices(client) as? [IOHIDServiceClient] ?? []
-        return services.filter {
+        services().filter {
             MicButtonRemap.isReceiver(vendorID: IOHIDServiceClientCopyProperty($0, kIOHIDVendorIDKey as CFString) as? Int,
                                       productID: IOHIDServiceClientCopyProperty($0, kIOHIDProductIDKey as CFString) as? Int)
         }
