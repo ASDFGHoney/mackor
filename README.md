@@ -99,6 +99,14 @@ Caps Lock을 한/영 키로 쓸 수 없는 키보드(Caps Lock에 다른 키 매
 `IOConsoleUsers`, 곧 `ioreg -l -w 0 | grep SecureInput`과 같은 값에서 읽습니다. 문서에 없는 키라 없으면 이름 없이 알립니다).
 비밀번호를 칠 때마다 켜졌다 꺼지므로 아이콘은 바꾸지 않습니다.
 
+## DJI 마이크 버튼
+
+DJI Mic Mini·Mini 2 수신기를 USB-C로 꽂으면 송신기 버튼이 볼륨 올림 키로 들어옵니다. mackor는 이 수신기에서 온 볼륨 키만 Fn으로 바꿔,
+Typeless처럼 Fn으로 받아쓰기를 켜고 끄는 앱을 마이크 버튼으로 쓸 수 있게 합니다(한 번 누르면 시작, 한 번 더 누르면 끝).
+키보드의 볼륨 키는 그대로이고, 접근성 권한과 상관없이 동작합니다. 수신기를 다시 꽂아도 바로 다시 걸리고, mackor를 종료하면 원래대로 돌아옵니다.
+기본으로 켜져 있으며, 수신기가 꽂혀 있을 때 메뉴의 **DJI 마이크 버튼을 Fn 키로**에서 끌 수 있습니다.
+Fn을 누를 때 입력 소스가 바뀌거나 이모지 창이 뜨면 시스템 설정 › 키보드의 ‘🌐 키를 눌러’를 ‘아무 작업 안 함’으로 바꾸세요.
+
 ## 알려진 한계
 
 - mackor가 켜져 있는 동안 Caps Lock으로 대문자를 고정할 수 없습니다. 대문자는 Shift로 입력하세요.
@@ -130,7 +138,7 @@ Caps Lock을 한/영 키로 쓸 수 없는 키보드(Caps Lock에 다른 키 매
 `swift build`·`swift test`가 실패하니, `xcode-select -p`가 CommandLineTools를 가리키면 `sudo xcode-select -s /Applications/Xcode.app`으로 바꾸세요.
 
 ```sh
-swift test            # 순수 로직 단위 테스트 (전환 게이트, 단축키 해석, 키 매핑, 설정 도우미 단계)
+swift test            # 순수 로직 단위 테스트 (전환 게이트, 단축키 해석, 키 매핑, DJI 마이크 버튼, 설정 도우미 단계)
 scripts/e2e.sh        # 실제 애플 한국어 입력기로 종단 간 검증 (터미널에 접근성 권한 필요, 실행 중 손대지 말 것)
 scripts/build.sh      # build/mackor.app (유니버설, 기본 ad-hoc 서명)
 scripts/install.sh    # /Applications 에 설치 후 실행 (brew 설치 뒤 첫 실행 흐름 재현)

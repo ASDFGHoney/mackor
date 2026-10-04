@@ -6,6 +6,7 @@ import MackorCore
 /// Caps Lock을 HID 단계에서 F18로 바꾼다(hidutil과 같은 공개 IOKit API, 권한 불필요). 켜져 있던 Caps Lock은 끈다.
 /// HID 매핑은 재부팅이나 키보드 재연결 때 사라지므로 시작, 새 키보드 연결, 잠자기 해제 때 다시 적용한다.
 /// 종료할 때는 mackor 항목만 지워 원래 키로 되돌린다.
+/// DJI 마이크 수신기가 꽂혀 있으면 송신기 버튼을 Fn으로 바꾸는 매핑도 같은 방식으로 건다(MicButtonRemap).
 final class KeyRemapper {
     static let shared = KeyRemapper()
 
@@ -21,6 +22,13 @@ final class KeyRemapper {
     var isActive = false {
         didSet { if isActive != oldValue { apply() } }
     }
+    /// false면 DJI 수신기의 버튼 → Fn 매핑을 지우고 걸지 않는다. 한/영 키와 따로 움직인다:
+    /// 이벤트 탭을 거치지 않으므로 접근성 권한이나 보안 입력과 상관없이 동작한다.
+    var isMicButtonActive = false {
+        didSet { if isMicButtonActive != oldValue { writeMicButton(active: isMicButtonActive) } }
+    }
+    /// DJI 수신기가 꽂혀 있는지. 메뉴에 켜고 끄는 항목을 이때만 보인다.
+    var hasMicReceiver: Bool { !micReceivers().isEmpty }
     private var started = false
 
     func start() {
@@ -32,14 +40,17 @@ final class KeyRemapper {
         }
     }
 
-    /// 모든 키보드에 Caps Lock → F18 매핑을 적용한다(비활성이면 지운다). 매핑이 이미 맞으면 쓰지 않는다.
+    /// 모든 키보드에 Caps Lock → F18 매핑을, DJI 수신기에 버튼 → Fn 매핑을 적용한다(비활성이면 지운다).
+    /// 매핑이 이미 맞으면 쓰지 않는다.
     func apply() {
         write(active: isActive)
+        writeMicButton(active: isMicButtonActive)
     }
 
     /// 종료 시: 우리 항목만 지운다.
     func remove() {
         write(active: false)
+        writeMicButton(active: false)
     }
 
     private func write(active: Bool) {
@@ -94,6 +105,33 @@ final class KeyRemapper {
         return services.filter { IOHIDServiceClientConformsTo($0, UInt32(kHIDPage_GenericDesktop), UInt32(kHIDUsage_GD_Keyboard)) != 0 }
     }
 
+    /// DJI 수신기마다 버튼 → Fn 매핑을 걸거나(active) 우리 항목을 지운다. 이미 맞으면 쓰지 않는다.
+    private func writeMicButton(active: Bool) {
+        guard Settings.shared.remapEnabled else { return }
+        for service in micReceivers() {
+            guard let current = mappings(of: service) else {
+                NSLog("mackor: %@의 키 매핑을 읽지 못해 건너뜁니다", name(of: service))
+                continue
+            }
+            let plan = MicButtonRemap.plan(current: current, active: active)
+            guard plan.changed else { continue }
+            if IOHIDServiceClientSetProperty(service, "UserKeyMapping" as CFString, plan.entries.map(\.dictionary) as CFArray) {
+                log.info("DJI 마이크 버튼 → Fn \(active ? "켬" : "끔", privacy: .public)")
+            } else {
+                NSLog("mackor: %@에 키 매핑을 쓰지 못했습니다", name(of: service))
+            }
+        }
+    }
+
+    /// 꽂혀 있는 DJI 수신기. 키보드가 아니라 consumer 장치라 keyboards()에 들지 않는다.
+    private func micReceivers() -> [IOHIDServiceClient] {
+        let services = IOHIDEventSystemClientCopyServices(client) as? [IOHIDServiceClient] ?? []
+        return services.filter {
+            MicButtonRemap.isReceiver(vendorID: IOHIDServiceClientCopyProperty($0, kIOHIDVendorIDKey as CFString) as? Int,
+                                      productID: IOHIDServiceClientCopyProperty($0, kIOHIDProductIDKey as CFString) as? Int)
+        }
+    }
+
     /// 읽을 수 없는 항목이 섞여 있으면 nil: 모르는 매핑을 지우지 않도록 그 키보드는 건너뛴다.
     private func mappings(of service: IOHIDServiceClient) -> [HIDRemap.Entry]? {
         guard let raw = IOHIDServiceClientCopyProperty(service, "UserKeyMapping" as CFString) else { return [] }
@@ -126,19 +164,20 @@ final class KeyRemapper {
     }
 
     /// delay 뒤에 한 번 다시 적용한다. 그 전에 다시 부르면 앞의 예약은 취소한다.
-    /// 그때 비활성이면 아무것도 쓰지 않는다. 우리 항목은 비활성이 될 때 이미 지웠고, 지금 있는 Caps Lock → F18은
-    /// 앞에 있는 다른 사용자의 mackor나 사용자가 직접 건 것일 수 있다(잠자기 해제·장치 연결마다 지우면 그 매핑이 사라진다).
+    /// 그때 비활성인 쪽(한/영 키와 마이크 버튼 각각)은 아무것도 쓰지 않는다. 우리 항목은 비활성이 될 때 이미 지웠고,
+    /// 지금 있는 Caps Lock → F18은 앞에 있는 다른 사용자의 mackor나 사용자가 직접 건 것일 수 있다(잠자기 해제·장치 연결마다 지우면 그 매핑이 사라진다).
     func scheduleApply(after delay: TimeInterval) {
         pendingApply?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.isActive else { return }
-            self.apply()
+            guard let self else { return }
+            if self.isActive { self.write(active: true) }
+            if self.isMicButtonActive { self.writeMicButton(active: true) }
         }
         pendingApply = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    /// 새 HID 서비스가 생기면(키보드 연결, 블루투스 재연결) 다시 적용한다. 레지스트리 알림이라 입력 모니터링 권한이 필요 없다.
+    /// 새 HID 서비스가 생기면(키보드·DJI 수신기 연결, 블루투스 재연결) 다시 적용한다. 레지스트리 알림이라 입력 모니터링 권한이 필요 없다.
     private func observeNewDevices() {
         guard let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
         notificationPort = port

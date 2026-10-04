@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
         if trusted, !engine.isRunning { engine.start() }
         if !trusted, engine.isRunning { engine.stop() }
         updateSecureInput()
+        remapper.isMicButtonActive = sessionActive && Settings.shared.micButtonEnabled
         remapper.isActive = engine.isRunning && sessionActive && !secureInput
         updateIcon()
         if trusted { rememberTrust() }
@@ -181,6 +182,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
         login.state = LoginItem.state == .enabled ? .on : .off
         login.isEnabled = Settings.shared.isAppBundle
         menu.addItem(login)
+        if remapper.hasMicReceiver {
+            let mic = item("DJI 마이크 버튼을 Fn 키로", #selector(toggleMicButton))
+            mic.state = Settings.shared.micButtonEnabled ? .on : .off
+            menu.addItem(mic)
+        }
         menu.addItem(item("설정 도우미…", #selector(showOnboarding)))
         menu.addItem(.separator())
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
@@ -202,6 +208,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Onboar
 
     @objc private func toggleLoginItem() {
         LoginItem.set(LoginItem.state != .enabled)
+    }
+
+    @objc private func toggleMicButton() {
+        Settings.shared.micButtonEnabled.toggle()
+        refresh()
     }
 
     @objc private func showOnboarding() {

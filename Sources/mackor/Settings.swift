@@ -23,6 +23,12 @@ final class Settings {
         set { defaults.set(newValue, forKey: "lastTrustedRequirement") }
     }
 
+    /// DJI 마이크 수신기가 꽂혀 있으면 송신기 버튼을 Fn으로 바꾼다(Typeless 같은 받아쓰기 앱의 Fn 단축키용). 기본은 켜짐.
+    var micButtonEnabled: Bool {
+        get { defaults.object(forKey: "micButtonEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "micButtonEnabled") }
+    }
+
     /// .app 번들로 실행 중인지. 터미널에서 띄운 개발용 실행 파일은 로그인 항목에 등록하면 안 된다
     /// (로그인할 때마다 macOS가 그 파일을 터미널로 연다).
     let isAppBundle = Bundle.main.bundleURL.pathExtension == "app"

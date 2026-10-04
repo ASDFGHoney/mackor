@@ -1,6 +1,6 @@
 cask "mackor" do
-  version "0.3.1"
-  sha256 "47f7266a08a446c302c936794ad9133282fa5b14125e0be7212b0a6f9d2ce770"
+  version "0.4.0"
+  sha256 "1906f38ff427790500f06d38a76ba26bc9d180d0dd6a7144fc5f8d264342ebe2"
 
   url "https://github.com/ASDFGHoney/mackor/releases/download/v#{version}/mackor-#{version}.zip"
   name "mackor"
